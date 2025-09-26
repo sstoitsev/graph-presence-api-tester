@@ -731,12 +731,6 @@ export default function GraphPresenceTester() {
                     </div>
                   )}
                 </div>
-                <details className="mt-4">
-                  <summary className="cursor-pointer text-sm text-muted-foreground">View Raw JSON</summary>
-                  <pre className="mt-2 text-xs bg-background p-2 rounded border overflow-auto">
-                    {JSON.stringify(presenceData, null, 2)}
-                  </pre>
-                </details>
               </div>
             )}
           </CardContent>
@@ -916,7 +910,7 @@ export default function GraphPresenceTester() {
           </CollapsibleContent>
         </Collapsible>
       </Card>
-            <Card className="mt-6">
+      <Card className="mt-6">
         <CardContent className="pt-6">
           <div className="text-center text-sm text-muted-foreground space-y-3">
             <p>
