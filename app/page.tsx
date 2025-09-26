@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Separator } from "@/components/ui/separator"
 import { useToast } from "@/hooks/use-toast"
-import { Toaster } from "@/components/ui/toaster"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { ChevronDown, ChevronRight } from "lucide-react"
 
 interface PresenceData {
   id?: string
@@ -28,6 +28,17 @@ interface UserData {
   displayName?: string
   userPrincipalName?: string
   id?: string
+}
+
+interface ApiLog {
+  id: string
+  timestamp: string
+  method: string
+  endpoint: string
+  request: any
+  response: any
+  status: "success" | "error"
+  duration: number
 }
 
 const userPresenceOptions = [
@@ -64,15 +75,73 @@ export default function GraphPresenceTester() {
 
   const [appPresenceSelection, setAppPresenceSelection] = useState(0)
 
+  const [apiLogs, setApiLogs] = useState<ApiLog[]>([])
+  const [isLogsOpen, setIsLogsOpen] = useState(false)
+
   const { toast } = useToast()
 
+  const stripTokens = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj
+    if (typeof obj === "string") {
+      if (obj.length > 50 && (obj.includes(".") || obj.match(/^[A-Za-z0-9_-]+$/))) {
+        return "[TOKEN_REDACTED]"
+      }
+      return obj
+    }
+    if (Array.isArray(obj)) {
+      return obj.map(stripTokens)
+    }
+    if (typeof obj === "object") {
+      const stripped: any = {}
+      for (const [key, value] of Object.entries(obj)) {
+        if (
+          ["token", "access_token", "authorization", "bearer", "secret", "password"].some((tokenField) =>
+            key.toLowerCase().includes(tokenField),
+          )
+        ) {
+          stripped[key] = "[TOKEN_REDACTED]"
+        } else {
+          stripped[key] = stripTokens(value)
+        }
+      }
+      return stripped
+    }
+    return obj
+  }
+
+  const addApiLog = (
+    method: string,
+    endpoint: string,
+    request: any,
+    response: any,
+    status: "success" | "error",
+    duration: number,
+  ) => {
+    const log: ApiLog = {
+      id: Date.now().toString(),
+      timestamp: new Date().toISOString(),
+      method,
+      endpoint,
+      request: stripTokens(request),
+      response: stripTokens(response),
+      status,
+      duration,
+    }
+    setApiLogs((prev) => [log, ...prev].slice(0, 50))
+  }
+
+  const clearLogs = () => {
+    setApiLogs([])
+    toast({
+      title: "Success",
+      description: "API logs cleared",
+    })
+  }
+
   useEffect(() => {
-    // Load non-sensitive data from localStorage (persists across browser sessions)
     const storedTenantId = localStorage.getItem("graph-tester-tenantId")
     const storedAppId = localStorage.getItem("graph-tester-appId")
     const storedUserObjectId = localStorage.getItem("graph-tester-userObjectId")
-
-    // Load sensitive data from sessionStorage (cleared when tab closes)
     const storedAppSecret = sessionStorage.getItem("graph-tester-appSecret")
 
     if (storedTenantId) setTenantId(storedTenantId)
@@ -133,6 +202,7 @@ export default function GraphPresenceTester() {
 
   const makeGraphRequest = async (action: string, body?: any, token?: string) => {
     const accessToken = token || appToken
+    const startTime = Date.now()
 
     if (!accessToken) {
       toast({
@@ -153,26 +223,37 @@ export default function GraphPresenceTester() {
     }
 
     try {
+      const requestPayload = {
+        token: accessToken,
+        userObjectId,
+        action,
+        body,
+      }
+
       const response = await fetch("/api/presence", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          token: accessToken, // Use the passed token or state token
-          userObjectId,
-          action,
-          body,
-        }),
+        body: JSON.stringify(requestPayload),
       })
 
+      const duration = Date.now() - startTime
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `HTTP ${response.status}`)
+        addApiLog("POST", `/api/presence (${action})`, requestPayload, responseData, "error", duration)
+        throw new Error(responseData.error || `HTTP ${response.status}`)
       }
 
-      return await response.json()
+      addApiLog("POST", `/api/presence (${action})`, requestPayload, responseData, "success", duration)
+      return responseData
     } catch (error) {
+      const duration = Date.now() - startTime
+      const errorResponse = { error: error instanceof Error ? error.message : "Unknown error occurred" }
+
+      addApiLog("POST", `/api/presence (${action})`, { action, body }, errorResponse, "error", duration)
+
       console.error("Graph API Error:", error)
       toast({
         title: "API Error",
@@ -194,26 +275,34 @@ export default function GraphPresenceTester() {
     }
 
     setLoading(true)
+    const startTime = Date.now()
+
     try {
+      const requestPayload = {
+        tenantId,
+        appId,
+        appSecret,
+      }
+
       const response = await fetch("/api/token", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          tenantId,
-          appId,
-          appSecret,
-        }),
+        body: JSON.stringify(requestPayload),
       })
 
+      const duration = Date.now() - startTime
+      const responseData = await response.json()
+
       if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `HTTP ${response.status}`)
+        addApiLog("POST", "/api/token", requestPayload, responseData, "error", duration)
+        throw new Error(responseData.error || `HTTP ${response.status}`)
       }
 
-      const data = await response.json()
-      setAppToken(data.access_token)
+      addApiLog("POST", "/api/token", requestPayload, responseData, "success", duration)
+
+      setAppToken(responseData.access_token)
 
       toast({
         title: "Success",
@@ -221,18 +310,16 @@ export default function GraphPresenceTester() {
       })
 
       if (userObjectId) {
-        // Run Who Am I - pass the fresh token directly
-        const userData = await makeGraphRequest("getUser", undefined, data.access_token)
+        const userData = await makeGraphRequest("getUser", undefined, responseData.access_token)
         if (userData) {
           setUserData(userData)
         }
 
-        // Run Get Presence - pass the fresh token directly
         console.log("[v0] Getting presence for user:", userObjectId)
         const body = {
           ids: [userObjectId],
         }
-        const presenceData = await makeGraphRequest("getPresence", body, data.access_token)
+        const presenceData = await makeGraphRequest("getPresence", body, responseData.access_token)
         console.log("[v0] Presence API response:", presenceData)
 
         if (presenceData && presenceData.value && presenceData.value.length > 0) {
@@ -251,6 +338,11 @@ export default function GraphPresenceTester() {
       setLoading(false)
       return true
     } catch (error) {
+      const duration = Date.now() - startTime
+      const errorResponse = { error: error instanceof Error ? error.message : "Failed to acquire token" }
+
+      addApiLog("POST", "/api/token", { tenantId, appId }, errorResponse, "error", duration)
+
       console.error("Token acquisition error:", error)
       toast({
         title: "Authentication Error",
@@ -572,85 +664,86 @@ export default function GraphPresenceTester() {
         </CardContent>
       </Card>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>User Information</CardTitle>
-          <CardDescription>Get information about the target user (Who Am I)</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={whoAmI} disabled={loading || !isAuthenticated || !userObjectId}>
-            {loading ? "Loading..." : "Who Am I"}
-          </Button>
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Information</CardTitle>
+            <CardDescription>Get information about the target user (Who Am I)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={whoAmI} disabled={loading || !isAuthenticated || !userObjectId}>
+              {loading ? "Loading..." : "Who Am I"}
+            </Button>
 
-          {userData && (
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <h4 className="font-semibold mb-2">User Information:</h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Display Name:</span>
-                  <Badge variant="outline">{userData.displayName}</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">User Principal Name:</span>
-                  <Badge variant="outline">{userData.userPrincipalName}</Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Object ID:</span>
-                  <Badge variant="outline">{userData.id}</Badge>
-                </div>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Get Presence */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Get Presence</CardTitle>
-          <CardDescription>Retrieve current presence information using bulk endpoint</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Button onClick={getPresence} disabled={loading || !isAuthenticated || !userObjectId}>
-            {loading ? "Loading..." : "Get Presence"}
-          </Button>
-
-          {presenceData && (
-            <div className="mt-4 p-4 bg-muted rounded-lg">
-              <h4 className="font-semibold mb-2">Current Presence:</h4>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Availability:</span>
-                  <Badge className={`${getPresenceColor(presenceData.availability)} font-medium`}>
-                    <span className="mr-1">{getPresenceIcon(presenceData.availability)}</span>
-                    {presenceData.availability}
-                  </Badge>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">Activity:</span>
-                  <Badge className={`${getPresenceColor(presenceData.availability)} font-medium`}>
-                    {presenceData.activity}
-                  </Badge>
-                </div>
-                {presenceData.statusMessage?.message?.content && (
-                  <div>
-                    <span className="font-medium">Status Message:</span>
-                    <p className="text-sm text-muted-foreground mt-1">{presenceData.statusMessage.message.content}</p>
+            {userData && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-semibold mb-2">User Information:</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Display Name:</span>
+                    <Badge variant="outline">{userData.displayName}</Badge>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">User Principal Name:</span>
+                    <Badge variant="outline">{userData.userPrincipalName}</Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Object ID:</span>
+                    <Badge variant="outline">{userData.id}</Badge>
+                  </div>
+                </div>
               </div>
-              <details className="mt-4">
-                <summary className="cursor-pointer text-sm text-muted-foreground">View Raw JSON</summary>
-                <pre className="mt-2 text-xs bg-background p-2 rounded border overflow-auto">
-                  {JSON.stringify(presenceData, null, 2)}
-                </pre>
-              </details>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
 
-      <div className="grid md:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>Get Presence</CardTitle>
+            <CardDescription>Retrieve current presence information using bulk endpoint</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={getPresence} disabled={loading || !isAuthenticated || !userObjectId}>
+              {loading ? "Loading..." : "Get Presence"}
+            </Button>
+
+            {presenceData && (
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <h4 className="font-semibold mb-2">Current Presence:</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Availability:</span>
+                    <Badge className={`${getPresenceColor(presenceData.availability)} font-medium`}>
+                      <span className="mr-1">{getPresenceIcon(presenceData.availability)}</span>
+                      {presenceData.availability}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">Activity:</span>
+                    <Badge className={`${getPresenceColor(presenceData.availability)} font-medium`}>
+                      {presenceData.activity}
+                    </Badge>
+                  </div>
+                  {presenceData.statusMessage?.message?.content && (
+                    <div>
+                      <span className="font-medium">Status Message:</span>
+                      <p className="text-sm text-muted-foreground mt-1">{presenceData.statusMessage.message.content}</p>
+                    </div>
+                  )}
+                </div>
+                <details className="mt-4">
+                  <summary className="cursor-pointer text-sm text-muted-foreground">View Raw JSON</summary>
+                  <pre className="mt-2 text-xs bg-background p-2 rounded border overflow-auto">
+                    {JSON.stringify(presenceData, null, 2)}
+                  </pre>
+                </details>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid md:grid-cols-2 gap-6 mb-6">
         <Card>
           <CardHeader>
             <CardTitle>Application Session Presence</CardTitle>
@@ -745,96 +838,101 @@ export default function GraphPresenceTester() {
         </Card>
       </div>
 
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>API and Implementation Information</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h4 className="font-semibold mb-2">API Endpoints Used:</h4>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>
-                <code>/communications/getPresencesByUserId</code> – Retrieves presence for specified users
-              </li>
-              <li>
-                <code>/users/&lt;user-id&gt;/presence/setPresence</code> – Creates or updates an application-session
-                presence
-              </li>
-              <li>
-                <code>/users/&lt;user-id&gt;/presence/setUserPreferredPresence</code> – Sets user-preferred presence
-              </li>
-              <li>
-                <code>/users/&lt;user-id&gt;/presence/clearPresence</code> – Clears the application-session presence
-              </li>
-              <li>
-                <code>/users/&lt;user-id&gt;/presence/clearUserPreferredPresence</code> – Clears the user-preferred
-                presence
-              </li>
-            </ul>
-          </div>
+      <Card className="mb-6">
+        <Collapsible open={isLogsOpen} onOpenChange={setIsLogsOpen}>
+          <CollapsibleTrigger asChild>
+            <CardHeader className="cursor-pointer hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="flex items-center gap-2">
+                    API Request/Response Logs
+                    <Badge variant="outline" className="text-xs">
+                      {apiLogs.length}
+                    </Badge>
+                  </CardTitle>
+                  <CardDescription>
+                    View detailed logs of all API requests and responses for troubleshooting (tokens are redacted for
+                    security)
+                  </CardDescription>
+                </div>
+                {isLogsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              </div>
+            </CardHeader>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <CardContent>
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-muted-foreground">
+                  Logs are stored in browser memory only and will disappear on page reload.
+                </p>
+                <Button variant="outline" size="sm" onClick={clearLogs} disabled={apiLogs.length === 0}>
+                  Clear Logs
+                </Button>
+              </div>
 
-          <div>
-            <h4 className="font-semibold mb-2">Authentication:</h4>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>
-                Uses OAuth 2.0 <strong>client-credentials (application) authentication</strong>
-              </li>
-              <li>Obtains a tenant-scoped app-only access token using client_id and client_secret</li>
-              <li>Token carries the application permissions granted to the app in Entra ID</li>
-            </ul>
-          </div>
+              {apiLogs.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  No API calls logged yet. Make some API requests to see logs here.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {apiLogs.map((log) => (
+                    <div key={log.id} className="border rounded-lg p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Badge variant={log.status === "success" ? "default" : "destructive"}>{log.method}</Badge>
+                          <code className="text-sm bg-muted px-2 py-1 rounded">{log.endpoint}</code>
+                          <Badge
+                            variant="outline"
+                            className={log.status === "success" ? "text-green-600" : "text-red-600"}
+                          >
+                            {log.status}
+                          </Badge>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {new Date(log.timestamp).toLocaleTimeString()} ({log.duration}ms)
+                        </div>
+                      </div>
 
-          <div>
-            <h4 className="font-semibold mb-2">Required Permissions:</h4>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>
-                <strong>Presence.ReadWrite.All (application)</strong> – needed for reading and writing presence
-              </li>
-              <li>
-                <em>Presence.Read.All may also be granted if read-only is required</em>
-              </li>
-            </ul>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h4 className="font-semibold mb-2">Presence Precedence (Highest to Lowest):</h4>
-            <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
-              <li>
-                <strong>User-preferred presence</strong> (if set and at least one session exists)
-              </li>
-              <li>
-                <strong>Application-session presence:</strong> DoNotDisturb → Busy → Available → Away
-              </li>
-              <li>Automatic presence determined by Teams/Outlook activity</li>
-            </ol>
-          </div>
-
-          <Separator />
-
-          <div>
-            <h4 className="font-semibold mb-2">Session Behavior:</h4>
-            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>
-                An "Available" application session degrades to AvailableInactive after about 5 minutes of user
-                inactivity and then to Away after a further period
-              </li>
-              <li>
-                <code>expirationDuration</code> defines how long the session is valid (minimum 5 minutes, maximum 4
-                hours)
-              </li>
-              <li>
-                After expiration, the application session is removed and no longer affects the user's visible presence
-              </li>
-            </ul>
-          </div>
-        </CardContent>
+                      <div className="grid md:grid-cols-2 gap-4">
+                        <div>
+                          <h5 className="text-sm font-medium mb-2">Request:</h5>
+                          <pre className="text-xs bg-muted p-2 rounded border whitespace-pre-wrap break-words">
+                            {JSON.stringify(log.request, null, 2)}
+                          </pre>
+                        </div>
+                        <div>
+                          <h5 className="text-sm font-medium mb-2">Response:</h5>
+                          <pre className="text-xs bg-muted p-2 rounded border whitespace-pre-wrap break-words">
+                            {JSON.stringify(log.response, null, 2)}
+                          </pre>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </CollapsibleContent>
+        </Collapsible>
       </Card>
-
-      <Card className="mt-6">
+            <Card className="mt-6">
         <CardContent className="pt-6">
-          <div className="text-center text-sm text-muted-foreground">
+          <div className="text-center text-sm text-muted-foreground space-y-3">
+            <p>
+              <strong>Built with v0 AI</strong> - This entire project was generated using v0.
+            </p>
+            <p>
+              <strong>Open Source</strong> - Fork and modify this tool on GitHub: <br />
+              <a
+                href="https://github.com/sstoitsev/graph-presence-api-tester"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline font-mono text-xs"
+              >
+                https://github.com/sstoitsev/graph-presence-api-tester
+              </a>
+            </p>
             <p>
               Special thanks to <strong>Tom van Leijsen</strong> at <strong>AnywhereNow</strong> for sharing the
               original script and clarifying the logic on how Microsoft Graph Presence APIs work, which helped create
@@ -843,8 +941,6 @@ export default function GraphPresenceTester() {
           </div>
         </CardContent>
       </Card>
-
-      <Toaster />
     </div>
   )
 }
