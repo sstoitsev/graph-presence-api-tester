@@ -1,7 +1,7 @@
 # Graph Presence API Tester
 
 A web-based tool for testing Microsoft Graph Presence APIs using client credentials authentication. 
-[![Deployed on Vercel]](https://v0-graph-presence-api-tester.vercel.app/)
+[Test it live!](https://v0-graph-presence-api-tester.vercel.app/)
 
 > **Built entirely with v0 AI** - This project was generated and developed using [v0.app](https://v0.app).
 
