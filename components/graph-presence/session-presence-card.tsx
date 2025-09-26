@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -38,9 +40,13 @@ export const SessionPresenceCard = ({
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="userPresence">Availability / Activity Combination</Label>
-          <Select value={userPresenceSelection.toString()} onValueChange={(value) => onSelectPresence(Number.parseInt(value))}>
+          <Select
+            key={userPresenceSelection}
+            value={userPresenceSelection === -1 ? "" : userPresenceSelection.toString()}
+            onValueChange={(value) => onSelectPresence(Number.parseInt(value))}
+          >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select presence option..." />
             </SelectTrigger>
             <SelectContent>
               {userPresenceOptions.map((option, index) => (
@@ -63,7 +69,10 @@ export const SessionPresenceCard = ({
         </div>
 
         <div className="flex gap-2">
-          <Button onClick={onSetPresence} disabled={loading || !isAuthenticated || !userObjectId}>
+          <Button
+            onClick={onSetPresence}
+            disabled={loading || !isAuthenticated || !userObjectId || userPresenceSelection === -1}
+          >
             Set Presence
           </Button>
           <Button variant="outline" onClick={onClearPresence} disabled={loading || !isAuthenticated || !userObjectId}>

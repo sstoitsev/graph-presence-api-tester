@@ -31,10 +31,10 @@ export default function GraphPresenceTester() {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const [userPresenceSelection, setUserPresenceSelection] = useState(0)
+  const [userPresenceSelection, setUserPresenceSelection] = useState(-1)
   const [expirationDuration, setExpirationDuration] = useState("PT5M")
 
-  const [appPresenceSelection, setAppPresenceSelection] = useState(0)
+  const [appPresenceSelection, setAppPresenceSelection] = useState(-1)
 
   const { toast } = useToast()
   const { apiLogs, addLog, clearLogs } = useApiLogs()
@@ -335,6 +335,15 @@ export default function GraphPresenceTester() {
       return
     }
 
+    if (userPresenceSelection === -1) {
+      toast({
+        title: "Error",
+        description: "Please select a presence option",
+        variant: "destructive",
+      })
+      return
+    }
+
     setLoading(true)
     const selectedOption = userPresenceOptions[userPresenceSelection]
     const body = {
@@ -372,6 +381,7 @@ export default function GraphPresenceTester() {
 
     const result = await makeGraphRequest("clearPresence", body)
     if (result) {
+      setUserPresenceSelection(-1)
       toast({
         title: "Success",
         description: "User presence cleared successfully",
@@ -386,6 +396,15 @@ export default function GraphPresenceTester() {
       toast({
         title: "Error",
         description: "Please provide a user object ID",
+        variant: "destructive",
+      })
+      return
+    }
+
+    if (appPresenceSelection === -1) {
+      toast({
+        title: "Error",
+        description: "Please select a presence option",
         variant: "destructive",
       })
       return
@@ -422,6 +441,7 @@ export default function GraphPresenceTester() {
     setLoading(true)
     const result = await makeGraphRequest("clearUserPreferredPresence")
     if (result) {
+      setAppPresenceSelection(-1)
       toast({
         title: "Success",
         description: "User preferred presence cleared successfully",
@@ -438,7 +458,9 @@ export default function GraphPresenceTester() {
     <div className="container mx-auto p-6 max-w-4xl">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-balance">Microsoft Graph Presence API Tester</h1>
-        <p className="text-muted-foreground mt-2">Test Microsoft Graph Presence APIs using client credentials authentication</p>
+        <p className="text-muted-foreground mt-2">
+          Test Microsoft Graph Presence APIs using client credentials authentication
+        </p>
       </div>
 
       <AuthenticationCard
@@ -521,9 +543,9 @@ export default function GraphPresenceTester() {
               </a>
             </p>
             <p>
-              Special thanks to <strong>Tom van Leijsen</strong> at <strong>AnywhereNow</strong> for sharing the original
-              script and clarifying the logic on how Microsoft Graph Presence APIs work, which helped create this
-              interactive testing tool.
+              Special thanks to <strong>Tom van Leijsen</strong> at <strong>AnywhereNow</strong> for sharing the
+              original script and clarifying the logic on how Microsoft Graph Presence APIs work, which helped create
+              this interactive testing tool.
             </p>
           </div>
         </CardContent>

@@ -1,3 +1,5 @@
+"use client"
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Label } from "@/components/ui/label"
@@ -33,9 +35,13 @@ export const PreferredPresenceCard = ({
       <CardContent className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="appPresence">Availability / Activity Combination</Label>
-          <Select value={appPresenceSelection.toString()} onValueChange={(value) => onSelectPresence(Number.parseInt(value))}>
+          <Select
+            key={appPresenceSelection}
+            value={appPresenceSelection === -1 ? "" : appPresenceSelection.toString()}
+            onValueChange={(value) => onSelectPresence(Number.parseInt(value))}
+          >
             <SelectTrigger>
-              <SelectValue />
+              <SelectValue placeholder="Select presence option..." />
             </SelectTrigger>
             <SelectContent>
               {appPresenceOptions.map((option, index) => (
@@ -48,7 +54,10 @@ export const PreferredPresenceCard = ({
         </div>
 
         <div className="flex gap-2 flex-wrap">
-          <Button onClick={onSetPreferredPresence} disabled={loading || !isAuthenticated || !userObjectId}>
+          <Button
+            onClick={onSetPreferredPresence}
+            disabled={loading || !isAuthenticated || !userObjectId || appPresenceSelection === -1}
+          >
             Set User Preferred Presence
           </Button>
           <Button
