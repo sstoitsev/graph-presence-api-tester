@@ -72,7 +72,7 @@ The Graph Presence API Tester simplifies testing and understanding Microsoft Gra
 
 ## Development
 
-```bash
+\`\`\`bash
 # Install dependencies
 npm install
 
@@ -81,7 +81,7 @@ npm run dev
 
 # Build for production
 npm run build
-```
+\`\`\`
 
 ## Acknowledgments
 

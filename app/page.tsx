@@ -53,6 +53,7 @@ export default function GraphPresenceTester() {
   const [appSecret, setAppSecret] = useState("")
   const [userObjectId, setUserObjectId] = useState("")
   const [appToken, setAppToken] = useState("")
+  const [showSecret, setShowSecret] = useState(false)
 
   const [presenceData, setPresenceData] = useState<PresenceData | null>(null)
   const [userData, setUserData] = useState<UserData | null>(null)
@@ -511,13 +512,25 @@ export default function GraphPresenceTester() {
           </div>
           <div>
             <Label htmlFor="appSecret">Client Secret</Label>
-            <Input
-              id="appSecret"
-              type="password"
-              placeholder="Enter your app registration client secret"
-              value={appSecret}
-              onChange={(e) => setAppSecret(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <Input
+                id="appSecret"
+                type={showSecret ? "text" : "password"}
+                placeholder="Enter your app registration client secret"
+                value={appSecret}
+                onChange={(e) => setAppSecret(e.target.value)}
+                className="flex-1"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowSecret(!showSecret)}
+                className="px-3"
+              >
+                {showSecret ? "Hide" : "Show"}
+              </Button>
+            </div>
           </div>
           <div>
             <Label htmlFor="userObjectId">User Object ID</Label>
