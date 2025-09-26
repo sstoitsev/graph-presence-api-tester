@@ -734,28 +734,40 @@ export default function GraphPresenceTester() {
 
       <Card className="mt-6">
         <CardHeader>
-          <CardTitle>API Information</CardTitle>
+          <CardTitle>API and Implementation Information</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div>
             <h4 className="font-semibold mb-2">API Endpoints Used:</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               <li>
-                <code>/communications/getPresencesByUserId</code> - Retrieves presence in bulk
+                <code>/communications/getPresencesByUserId</code> – Retrieves presence for specified users
               </li>
               <li>
-                <code>/users/&lt;user-id&gt;/presence/setPresence</code> - Creates application sessions (left panel)
+                <code>/users/&lt;user-id&gt;/presence/setPresence</code> – Creates or updates an application-session
+                presence
               </li>
               <li>
-                <code>/users/&lt;user-id&gt;/presence/setUserPreferredPresence</code> - Sets user preferred presence
-                (right panel)
+                <code>/users/&lt;user-id&gt;/presence/setUserPreferredPresence</code> – Sets user-preferred presence
               </li>
               <li>
-                <code>/users/&lt;user-id&gt;/presence/clearPresence</code> - Clears application sessions
+                <code>/users/&lt;user-id&gt;/presence/clearPresence</code> – Clears the application-session presence
               </li>
               <li>
-                <code>/users/&lt;user-id&gt;/presence/clearUserPreferredPresence</code> - Clears user preferred presence
+                <code>/users/&lt;user-id&gt;/presence/clearUserPreferredPresence</code> – Clears the user-preferred
+                presence
               </li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="font-semibold mb-2">Authentication:</h4>
+            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+              <li>
+                Uses OAuth 2.0 <strong>client-credentials (application) authentication</strong>
+              </li>
+              <li>Obtains a tenant-scoped app-only access token using client_id and client_secret</li>
+              <li>Token carries the application permissions granted to the app in Entra ID</li>
             </ul>
           </div>
 
@@ -763,7 +775,10 @@ export default function GraphPresenceTester() {
             <h4 className="font-semibold mb-2">Required Permissions:</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
               <li>
-                <code>Presence.ReadWrite.All</code> - Application permission required for all operations
+                <strong>Presence.ReadWrite.All (application)</strong> – needed for reading and writing presence
+              </li>
+              <li>
+                <em>Presence.Read.All may also be granted if read-only is required</em>
               </li>
             </ul>
           </div>
@@ -774,23 +789,31 @@ export default function GraphPresenceTester() {
             <h4 className="font-semibold mb-2">Presence Precedence (Highest to Lowest):</h4>
             <ol className="list-decimal list-inside text-sm text-muted-foreground space-y-1">
               <li>
-                <strong>User Preferred Presence</strong> (setUserPreferredPresence API)
+                <strong>User-preferred presence</strong> (if set and at least one session exists)
               </li>
               <li>
-                <strong>Application Sessions</strong> (setPresence API): DoNotDisturb → Busy → Available → Away
+                <strong>Application-session presence:</strong> DoNotDisturb → Busy → Available → Away
               </li>
-              <li>Automatic presence detection by Microsoft Teams/Outlook</li>
+              <li>Automatic presence determined by Teams/Outlook activity</li>
             </ol>
           </div>
 
           <Separator />
 
           <div>
-            <h4 className="font-semibold mb-2">Session Timeouts:</h4>
+            <h4 className="font-semibold mb-2">Session Behavior:</h4>
             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
-              <li>Available sessions timeout after 5 minutes of inactivity</li>
-              <li>Sessions expire based on expirationDuration (5 min to 4 hours)</li>
-              <li>Expired sessions become Offline</li>
+              <li>
+                An "Available" application session degrades to AvailableInactive after about 5 minutes of user
+                inactivity and then to Away after a further period
+              </li>
+              <li>
+                <code>expirationDuration</code> defines how long the session is valid (minimum 5 minutes, maximum 4
+                hours)
+              </li>
+              <li>
+                After expiration, the application session is removed and no longer affects the user's visible presence
+              </li>
             </ul>
           </div>
         </CardContent>
