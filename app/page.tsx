@@ -644,7 +644,7 @@ export default function GraphPresenceTester() {
             <CardDescription>Set or clear presence as an application session (uses setPresence API)</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="userPresence">Availability / Activity Combination</Label>
               <Select
                 value={userPresenceSelection.toString()}
@@ -663,7 +663,7 @@ export default function GraphPresenceTester() {
               </Select>
             </div>
 
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="expirationDuration">Expiration Duration (ISO 8601)</Label>
               <Input
                 id="expirationDuration"
@@ -696,7 +696,7 @@ export default function GraphPresenceTester() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="appPresence">Availability / Activity Combination</Label>
               <Select
                 value={appPresenceSelection.toString()}
@@ -792,6 +792,18 @@ export default function GraphPresenceTester() {
               <li>Sessions expire based on expirationDuration (5 min to 4 hours)</li>
               <li>Expired sessions become Offline</li>
             </ul>
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card className="mt-6">
+        <CardContent className="pt-6">
+          <div className="text-center text-sm text-muted-foreground">
+            <p>
+              Special thanks to <strong>Tom van Leijsen</strong> at <strong>AnywhereNow</strong> for sharing the
+              original script and clarifying the logic on how Microsoft Graph Presence APIs work, which helped create
+              this interactive testing tool.
+            </p>
           </div>
         </CardContent>
       </Card>
