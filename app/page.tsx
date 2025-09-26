@@ -130,6 +130,58 @@ export default function GraphPresenceTester() {
     })
   }
 
+  const makeGraphRequest = async (action: string, body?: any, token?: string) => {
+    const accessToken = token || appToken
+
+    if (!accessToken) {
+      toast({
+        title: "Error",
+        description: "Please acquire an app token first",
+        variant: "destructive",
+      })
+      return null
+    }
+
+    if (!userObjectId) {
+      toast({
+        title: "Error",
+        description: "Please provide a user object ID",
+        variant: "destructive",
+      })
+      return null
+    }
+
+    try {
+      const response = await fetch("/api/presence", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          token: accessToken, // Use the passed token or state token
+          userObjectId,
+          action,
+          body,
+        }),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Graph API Error:", error)
+      toast({
+        title: "API Error",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      })
+      return null
+    }
+  }
+
   const getAppToken = async () => {
     if (!tenantId || !appId || !appSecret) {
       toast({
@@ -167,6 +219,34 @@ export default function GraphPresenceTester() {
         description: "App token acquired successfully",
       })
 
+      if (userObjectId) {
+        // Run Who Am I - pass the fresh token directly
+        const userData = await makeGraphRequest("getUser", undefined, data.access_token)
+        if (userData) {
+          setUserData(userData)
+        }
+
+        // Run Get Presence - pass the fresh token directly
+        console.log("[v0] Getting presence for user:", userObjectId)
+        const body = {
+          ids: [userObjectId],
+        }
+        const presenceData = await makeGraphRequest("getPresence", body, data.access_token)
+        console.log("[v0] Presence API response:", presenceData)
+
+        if (presenceData && presenceData.value && presenceData.value.length > 0) {
+          console.log("[v0] Setting presence data:", presenceData.value[0])
+          setPresenceData(presenceData.value[0])
+        } else {
+          console.log("[v0] No presence data found in response")
+        }
+
+        toast({
+          title: "Complete",
+          description: "Token acquired and user data retrieved",
+        })
+      }
+
       setLoading(false)
       return true
     } catch (error) {
@@ -178,56 +258,6 @@ export default function GraphPresenceTester() {
       })
       setLoading(false)
       return false
-    }
-  }
-
-  const makeGraphRequest = async (action: string, body?: any) => {
-    if (!appToken) {
-      toast({
-        title: "Error",
-        description: "Please acquire an app token first",
-        variant: "destructive",
-      })
-      return null
-    }
-
-    if (!userObjectId) {
-      toast({
-        title: "Error",
-        description: "Please provide a user object ID",
-        variant: "destructive",
-      })
-      return null
-    }
-
-    try {
-      const response = await fetch("/api/presence", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          token: appToken,
-          userObjectId,
-          action,
-          body,
-        }),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || `HTTP ${response.status}`)
-      }
-
-      return await response.json()
-    } catch (error) {
-      console.error("Graph API Error:", error)
-      toast({
-        title: "API Error",
-        description: error instanceof Error ? error.message : "Unknown error occurred",
-        variant: "destructive",
-      })
-      return null
     }
   }
 
